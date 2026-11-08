@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>撸货进销存</title>
+<meta name="theme-color" content="#5b6cff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="撸货进销存">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+
+<style>
+  :root{
+    --bg:#f2f4f8; --card:#ffffff; --text:#1d2433; --muted:#8a92a6;
+    --accent:#5b6cff; --accent-soft:#eef0ff; --expense:#ef3f56; --income:#16a05d;
+    --amber:#f59e0b; --blue:#3b82f6; --border:#e7eaf1;
+    --radius:16px; --shadow:0 2px 12px rgba(22,28,55,.06);
+    --nav-h:64px; --sidebar-w:212px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:inherit;}
+  input,select,textarea{font-family:inherit;font-size:15px;color:var(--text);}
+  .hidden{display:none !important;}
+
+  #app{min-height:100vh;display:flex;flex-direction:column;}
+  #topbar{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;padding:0 16px;background:rgba(255,255,255,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);}
+  #topbar .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;}
+  #topbar .brand .logo{font-size:20px;}
+  #main{flex:1;width:100%;max-width:1000px;margin:0 auto;padding:16px 14px calc(var(--nav-h) + 24px);}
+
+  #bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:30;height:calc(var(--nav-h) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-top:1px solid var(--border);display:flex;}
+  .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-size:11px;}
+  .nav-item .ico{font-size:21px;line-height:1;filter:grayscale(1) opacity(.55);transition:.15s;}
+  .nav-item.active{color:var(--accent);font-weight:600;}
+  .nav-item.active .ico{filter:none;}
+
+  @media (min-width:860px){
+    #app{flex-direction:row;}
+    #topbar{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;flex-direction:column;align-items:flex-start;justify-content:flex-start;padding:24px 16px;border-bottom:none;border-right:1px solid var(--border);}
+    #topbar .brand{margin-bottom:32px;}
+    #bottomnav{position:fixed;left:0;top:0;bottom:auto;height:100vh;width:var(--sidebar-w);flex-direction:column;justify-content:flex-start;padding:96px 10px 0;background:rgba(255,255,255,.86);border-top:none;border-right:1px solid var(--border);}
+    .nav-item{flex:none;width:100%;flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 14px;border-radius:12px;font-size:14px;}
+    .nav-item.active{background:var(--accent-soft);}
+    #main{margin-left:var(--sidebar-w);padding:24px 28px 48px;max-width:1040px;}
+  }
+
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:14px;}
+  .card-title{font-weight:700;font-size:15px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+  .muted{color:var(--muted);font-size:13px;font-weight:400;}
+  .hint{color:var(--muted);font-size:12px;margin-top:8px;}
+  .empty{text-align:center;color:var(--muted);padding:36px 12px;}
+  .empty .em{font-size:40px;display:block;margin-bottom:8px;}
+
+  /* Hero */
+  .hero{background:linear-gradient(135deg,#232741,#3c3f68);color:#fff;border-radius:20px;padding:20px;margin-bottom:14px;box-shadow:0 8px 24px rgba(28,32,64,.35);}
+  .hero .h-label{font-size:13px;opacity:.8;}
+  .hero .h-val{font-size:34px;font-weight:800;margin:4px 0 16px;letter-spacing:.5px;}
+  .hero .h-val.pos{color:#6ee7a8;}
+  .hero .h-val.neg{color:#ff9aa8;}
+  .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .hero-grid .m{background:rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;}
+  .hero-grid .m .lab{font-size:12px;opacity:.85;}
+  .hero-grid .m .val{font-size:17px;font-weight:700;margin-top:2px;}
+
+  .warn-banner{display:flex;align-items:center;gap:10px;background:#fff7e6;border:1px solid #ffe1a8;color:#8a5a00;border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:14px;}
+  .warn-banner .b-grow{flex:1;}
+  .warn-banner .b-num{font-weight:800;color:#c2410c;}
+  .warn-banner button{background:#f59e0b;color:#fff;border-radius:10px;padding:8px 14px;font-weight:700;font-size:13px;flex-shrink:0;}
+
+  .big-actions{display:flex;gap:10px;margin-bottom:14px;}
+  .big-actions button{flex:1;padding:15px;border-radius:14px;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px;transition:.15s;}
+  .big-actions button:active{transform:scale(.98);opacity:.92;}
+  .btn-purchase{background:var(--accent);color:#fff;}
+  .btn-sell{background:var(--income);color:#fff;}
+
+  /* 表格 */
+  .table-wrap{overflow-x:auto;margin:0 -4px;}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:820px;}
+  table.tbl th,table.tbl td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+  table.tbl th{color:var(--muted);font-weight:600;font-size:12px;background:var(--card);position:sticky;top:0;z-index:1;}
+  table.tbl td.num{text-align:right;}
+  table.tbl td .ser{font-weight:700;color:var(--accent);}
+  table.tbl td .pos{color:var(--income);font-weight:700;}
+  table.tbl td .neg{color:var(--expense);font-weight:700;}
+  table.tbl tr.sold-row{opacity:.68;}
+  table.tbl input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);}
+  .ops{display:flex;gap:4px;}
+  .ops button{width:28px;height:28px;border-radius:7px;font-size:13px;background:#f0f2f8;}
+  .ops button.del{background:#fdecef;}
+  table.tbl.sell-tbl{min-width:480px;}
+  .sell-tbl td input[type=text]{width:100%;min-width:90px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;outline:none;background:#fafbfd;font-size:13px;}
+  .sell-tbl td input[type=text]:focus{border-color:var(--accent);}
+  .sell-tbl td input[type=checkbox]{width:18px;height:18px;margin:0 auto;display:block;accent-color:var(--accent);}
+  .sell-group{border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;}
+  .sg-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .sg-name{font-weight:700;flex:1;min-width:130px;}
+  .sg-price{display:flex;align-items:center;gap:6px;}
+  .sg-price label{font-size:12px;color:var(--muted);}
+  .sg-price input{width:110px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;outline:none;background:#fafbfd;}
+  .sg-price input:focus{border-color:var(--accent);}
+  .sg-paid{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;}
+  .sg-paid input{width:16px;height:16px;accent-color:var(--accent);}
+  .sg-items{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:6px;}
+  .sg-item{display:flex;align-items:center;gap:10px;font-size:13px;}
+  .sg-serial{font-weight:600;color:var(--accent);min-width:90px;}
+  .sg-wear{display:flex;align-items:center;gap:5px;color:var(--muted);}
+  .sg-wear input{width:90px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;outline:none;background:#fafbfd;}
+  .sg-wear input:focus{border-color:var(--accent);}
+
+  .action-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+  .action-bar .sel-all{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;}
+  .action-bar .sel-all input{width:16px;height:16px;accent-color:var(--accent);}
+  .action-bar .spacer{flex:1;}
+  .action-bar .sell-btn{background:var(--income);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;}
+  .action-bar .sell-btn:disabled{background:#b6c0ce;cursor:not-allowed;}
+
+  .filters .search{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;outline:none;background:#fafbfd;margin-bottom:10px;}
+  .filters .search:focus{border-color:var(--accent);}
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .filter-row select{flex:1;min-width:100px;border:1px solid var(--border);border-radius:10px;padding:9px 8px;outline:none;background:#fafbfd;}
+
+  .badge{display:inline-block;padding:2px 9px;border-radius:8px;font-size:11px;font-weight:700;flex-shrink:0;}
+  .badge.stock{background:#eef0f5;color:#6b7280;}
+  .badge.pending{background:#fff3e0;color:#c2410c;}
+  .badge.done{background:#e7f7ef;color:var(--income);}
+
+  /* 统计 */
+  .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+  @media (min-width:560px){ .stat-grid{grid-template-columns:repeat(5,1fr);} }
+  .stat-box{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:14px;text-align:center;}
+  .stat-box .lab{font-size:12px;color:var(--muted);}
+  .stat-box .val{font-size:17px;font-weight:800;margin-top:4px;}
+  .stat-box .val.pos{color:var(--income);}
+  .stat-box .val.neg{color:var(--expense);}
+
+  .rank-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .rank-row:last-child{border-bottom:none;}
+  .rank-row .idx{width:22px;height:22px;border-radius:7px;background:#f0f2f8;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);flex-shrink:0;}
+  .rank-row .rn{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600;}
+  .rank-row .rsub{font-size:12px;color:var(--muted);flex-shrink:0;}
+  .rank-row .rval{font-weight:700;flex-shrink:0;}
+  .rank-row .rval.pos{color:var(--income);}
+  .rank-row .rval.neg{color:var(--expense);}
+
+  .legend-trend{display:flex;gap:12px;font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .legend-trend .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+  .bar-chart{display:flex;gap:10px;height:180px;align-items:flex-end;}
+  .bar-group{flex:1;display:flex;flex-direction:column;height:100%;}
+  .bars{flex:1;display:flex;align-items:flex-end;justify-content:center;gap:4px;}
+  .bar{width:11px;border-radius:5px 5px 0 0;min-height:2px;}
+  .bar.invested{background:var(--expense);}
+  .bar.received{background:var(--income);}
+  .bar-label{text-align:center;font-size:11px;color:var(--muted);margin-top:6px;}
+
+  /* 设置 */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:#f0f2f8;font-size:13px;font-weight:600;}
+  .chip .x{color:var(--muted);font-size:14px;line-height:1;cursor:pointer;}
+  .add-row{display:flex;gap:8px;}
+  .add-row input{flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 12px;outline:none;background:#fafbfd;}
+  .btn{padding:9px 14px;border-radius:10px;font-weight:600;transition:.12s;}
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-ghost{background:#f0f2f8;color:var(--text);}
+  .btn-danger{background:#fdecef;color:var(--expense);}
+  .btn-block{display:block;width:100%;padding:12px;border-radius:12px;font-weight:700;margin-top:6px;}
+
+  /* 弹窗 */
+  #overlay{position:fixed;inset:0;background:rgba(20,24,40,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center;}
+  #overlay.hidden{display:none;}
+  @media (min-width:600px){ #overlay{align-items:center;} }
+  .modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding:20px;box-shadow:0 -10px 40px rgba(0,0,0,.2);}
+  @media (min-width:600px){ .modal{border-radius:20px;} }
+  .modal-title{font-weight:800;font-size:17px;margin-bottom:16px;text-align:center;}
+  .modal-actions{display:flex;gap:10px;margin-top:16px;}
+  .modal-actions .btn{flex:1;padding:12px;border-radius:12px;font-weight:700;text-align:center;}
+  .section-label{font-size:12px;font-weight:700;color:var(--accent);margin:14px 0 8px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .form-grid .full{grid-column:1/-1;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;outline:none;background:#fafbfd;}
+  .field textarea{resize:vertical;font-size:14px;line-height:1.5;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+  .field .prefix{position:relative;}
+  .field .prefix input{padding-left:26px;}
+  .field .prefix .cur{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;}
+  .sel-count{background:var(--accent-soft);color:var(--accent);border-radius:10px;padding:10px 12px;font-weight:700;margin-bottom:14px;text-align:center;}
+
+  #toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + 30px);transform:translateX(-50%);background:rgba(20,24,40,.92);color:#fff;padding:10px 18px;border-radius:12px;font-size:14px;z-index:60;transition:opacity .2s;max-width:86vw;text-align:center;}
+  #toast.hidden{opacity:0;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand"><span class="logo">📦</span><span>撸货进销存</span></div>
+  </header>
+  <main id="main"></main>
+  <nav id="bottomnav">
+    <button class="nav-item" data-view="home"><span class="ico">📊</span><span>总览</span></button>
+    <button class="nav-item" data-view="records"><span class="ico">📦</span><span>货单</span></button>
+    <button class="nav-item" data-view="stats"><span class="ico">🏆</span><span>统计</span></button>
+    <button class="nav-item" data-view="settings"><span class="ico">⚙️</span><span>设置</span></button>
+  </nav>
+</div>
+<div id="overlay" class="hidden"></div>
+<div id="toast" class="hidden"></div>
+
+<script>
+"use strict";
+
+/* ---------- 数据层 ---------- */
+const LS_KEY = "luhuo.data.v3";
+const defaults = () => ({
+  suppliers: ["淘宝","拼多多","京东","抖音","闲鱼","其他"],
+  brands: ["苹果","华为","小米","荣耀","OPPO","vivo","三星","其他"],
+  devices: []   // 每件设备一行
+});
+let state = load();
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(d && Array.isArray(d.devices)){
+        return {
+          suppliers: Array.isArray(d.suppliers) && d.suppliers.length ? d.suppliers : defaults().suppliers,
+          brands: Array.isArray(d.brands) && d.brands.length ? d.brands : defaults().brands,
+          devices: d.devices,
+          syncedAt: d.syncedAt
+        };
+      }
+    }
+  }catch(e){}
+  return defaults();
+}
+function persistLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function save(){ persistLocal(); schedulePush(); }
+
+/* ---------- 工具 ---------- */
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function today(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fmt(n){ return "¥" + Number(n||0).toLocaleString("zh-CN",{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtProfit(n){ const v=Math.round((n||0)*100)/100; return (v>=0?"+":"−")+fmt(Math.abs(v)); }
+function parseAmount(s){ const n=parseFloat(String(s).replace(/[,¥\s]/g,"")); return isFinite(n)?n:NaN; }
+function num(v,d){ const n=parseAmount(v); return isNaN(n)?d:n; }
+function round2(n){ return Math.round((n||0)*100)/100; }
+function shortDate(d){ return d ? d.slice(5).replace("-","/") : ""; }
+function monthKey(d){ return String(d).slice(0,7); }
+function thisMonth(){ return today().slice(0,7); }
+function shiftMonth(ym,d){ const [y,m]=ym.split("-").map(Number); const t=new Date(y,m-1+d,1); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0"); }
+function lastMonths(ym,n){ const a=[]; for(let i=n-1;i>=0;i--) a.push(shiftMonth(ym,-i)); return a; }
+function parseSerials(s){ return String(s||"").split(/[\n,，、\s]+/).map(x=>x.trim()).filter(Boolean); }
+function distribute(total, count){ const tc=Math.round(total*100); const base=Math.floor(tc/count); const rem=tc-base*count; const a=[]; for(let i=0;i<count;i++) a.push((base+(i<rem?1:0))/100); return a; }
+const BRAND_ICON = {"苹果":"🍎","华为":"📱","小米":"📱","荣耀":"📱","OPPO":"📱","vivo":"📱","三星":"📱"};
+function brandIcon(b){ return BRAND_ICON[b] || "📦"; }
+function productName(r){ return [r.brand, r.model].filter(Boolean).join(" ") || "未命名"; }
+
+/* 计算 */
+function unitCost(r){ return (r.buyPrice||0) + (r.buyShipping||0); }
+function pending(r){ return r.sold ? Math.max(0, (r.sellPrice||0) - (r.paid||0)) : 0; }
+function received(r){ return (r.paid||0) + (r.rebate||0) + (r.priceProtection||0); }
+function profit(r){ if(!r.sold) return 0; return (r.sellPrice||0)+(r.rebate||0)+(r.priceProtection||0)-(r.buyPrice||0)-(r.buyShipping||0)-(r.sellShipping||0); }
+function status(r){ if(!r.sold) return "stock"; if(pending(r)>0.005) return "pending"; return "done"; }
+const STATUS = { stock:{label:"在库",cls:"stock"}, pending:{label:"待回款",cls:"pending"}, done:{label:"已回款",cls:"done"} };
+
+function totals(){
+  let invested=0, received_=0, pend=0, stockV=0, stockN=0;
+  state.devices.forEach(r => {
+    invested += unitCost(r);
+    received_ += received(r);
+    pend += pending(r);
+    if(!r.sold){ stockV += unitCost(r); stockN++; }
+  });
+  return { invested, received: received_, pending: pend, stockValue: stockV, stockCount: stockN, net: received_-invested };
+}
+function pendingList(){ return state.devices.filter(r=>pending(r)>0.005).sort((a,b)=>pending(b)-pending(a)); }
+function stockList(){ return state.devices.filter(r=>!r.sold); }
+
+/* ---------- 视图状态 ---------- */
+let view = "home";
+const recFilter = { search:"", status:"", brand:"", supplier:"" };
+let selected = new Set();
+let modal = null; // {kind:"purchase"|"sell"|"edit", id}
+const pform = { brand:"", model:"", supplier:"", buyer:"", buyDate:today(), buyPrice:"", buyShipping:"", qty:"1", serials:"", rebate:"", priceProtection:"", note:"" };
+const sform = { shipping:"", customer:"", sellDate:today(), note:"" };
+let sellData = { prices:{}, paid:{}, wears:{} };
+const eform = { serial:"", brand:"", model:"", supplier:"", buyer:"", buyDate:"", buyPrice:"", buyShipping:"", rebate:"", priceProtection:"", sold:"0", sellPrice:"", sellShipping:"", wear:"", sellDate:"", customer:"", paidFlag:"1", note:"" };
+
+/* ---------- 渲染 ---------- */
+const main = document.getElementById("main");
+const toastEl = document.getElementById("toast");
+function render(){ renderNav(); if(view==="home") renderHome(); else if(view==="records") renderRecords(); else if(view==="stats") renderStats(); else if(view==="settings") renderSettings(); window.scrollTo(0,0); }
+function renderNav(){ document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active", b.dataset.view===view)); }
+
+/* 首页 */
+function renderHome(){
+  const t = totals();
+  const pend = pendingList();
+  const warn = t.pending > 0.005 ? `<div class="warn-banner"><span>💰</span><span class="b-grow">还有 <span class="b-num">${fmt(t.pending)}</span> 卖出款未到账（${pend.length} 件）</span><button data-action="goto-pending">去处理</button></div>` : "";
+  const recent = state.devices.slice().sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,8);
+  main.innerHTML = `
+    <div class="hero">
+      <div class="h-label">现金流净利润（已回款 − 总投入）</div>
+      <div class="h-val ${t.net>=0?"pos":"neg"}">${fmtProfit(t.net)}</div>
+      <div class="hero-grid">
+        <div class="m"><div class="lab">总投入</div><div class="val">${fmt(t.invested)}</div></div>
+        <div class="m"><div class="lab">已回款(含返利·价保)</div><div class="val">${fmt(t.received)}</div></div>
+        <div class="m"><div class="lab">待回款</div><div class="val">${fmt(t.pending)}</div></div>
+        <div class="m"><div class="lab">在库 ${t.stockCount}件</div><div class="val">${fmt(t.stockValue)}</div></div>
+      </div>
+    </div>
+    ${warn}
+    <div class="big-actions">
+      <button class="btn-purchase" data-action="purchase">＋ 进货</button>
+      <button class="btn-sell" data-action="goto-records">📦 去卖货</button>
+    </div>
+    <div class="card">
+      <div class="card-title">最近入库 <button class="btn btn-ghost" data-action="goto-records">全部货单</button></div>
+      ${recent.length ? recent.map(r=>`
+        <div class="rank-row">
+          <span class="rn">${esc(r.serial)||"—"} · ${esc(productName(r))}</span>
+          <span class="rsub">${esc(r.supplier||"")}</span>
+          <span class="badge ${STATUS[status(r)].cls}">${STATUS[status(r)].label}</span>
+        </div>`).join("") : `<div class="empty"><span class="em">📦</span>还没有设备，点「进货」入库</div>`}
+    </div>`;
+}
+
+/* 货单（表格） */
+function renderRecords(){
+  const sup = Array.from(new Set(state.devices.map(r=>r.supplier).filter(Boolean).concat(state.suppliers))).sort();
+  const brd = Array.from(new Set(state.devices.map(r=>r.brand).filter(Boolean).concat(state.brands))).sort();
+  const supOpts = `<option value="">全部渠道</option>`+sup.map(p=>`<option value="${esc(p)}" ${recFilter.supplier===p?"selected":""}>${esc(p)}</option>`).join("");
+  const brdOpts = `<option value="">全部品牌</option>`+brd.map(b=>`<option value="${esc(b)}" ${recFilter.brand===b?"selected":""}>${esc(b)}</option>`).join("");
+  const stOpts = `<option value="">全部状态</option>`+Object.keys(STATUS).map(k=>`<option value="${k}" ${recFilter.status===k?"selected":""}>${STATUS[k].label}</option>`).join("");
+
+  main.innerHTML = `
+    <div class="filters card">
+      <input class="search" id="search" type="text" placeholder="搜索串号 / 品牌 / 型号 / 下单人 / 客户…" value="${esc(recFilter.search)}">
+      <div class="filter-row">
+        <select id="f-status">${stOpts}</select>
+        <select id="f-brand">${brdOpts}</select>
+        <select id="f-supplier">${supOpts}</select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="action-bar">
+        <label class="sel-all"><input type="checkbox" id="select-all"> 全选在库</label>
+        <div class="spacer"></div>
+        <button class="btn btn-primary" data-action="purchase">＋ 进货</button>
+        <button class="sell-btn" id="sell-btn" data-action="sell" ${selected.size?"":"disabled"}>卖货(${selected.size})</button>
+      </div>
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead><tr><th style="width:34px"></th><th>串号</th><th>商品</th><th>渠道</th><th>下单人</th><th>进价</th><th>售价</th><th>客户</th><th>状态</th><th>利润</th><th></th></tr></thead>
+          <tbody id="tbody">${rowsHtml()}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+function filteredDevices(){
+  let list = state.devices.slice().sort((a,b)=> b.buyDate.localeCompare(a.buyDate) || (b.createdAt||"").localeCompare(a.createdAt||""));
+  const q = recFilter.search.trim().toLowerCase();
+  if(q) list = list.filter(r =>
+    (r.serial||"").toLowerCase().includes(q) || (r.brand||"").toLowerCase().includes(q) ||
+    (r.model||"").toLowerCase().includes(q) || (r.buyer||"").toLowerCase().includes(q) ||
+    (r.customer||"").toLowerCase().includes(q) || (r.supplier||"").toLowerCase().includes(q) ||
+    (r.note||"").toLowerCase().includes(q));
+  if(recFilter.status) list = list.filter(r=>status(r)===recFilter.status);
+  if(recFilter.brand) list = list.filter(r=>(r.brand||"")===recFilter.brand);
+  if(recFilter.supplier) list = list.filter(r=>(r.supplier||"")===recFilter.supplier);
+  return list;
+}
+function rowsHtml(){
+  const list = filteredDevices();
+  if(!list.length) return `<tr><td colspan="11"><div class="empty"><span class="em">🔍</span>没有匹配的设备</div></td></tr>`;
+  return list.map(r => {
+    const st = STATUS[status(r)];
+    const p = profit(r);
+    return `<tr class="${r.sold?"sold-row":""}">
+      <td><input type="checkbox" data-sel="device" data-id="${r.id}" ${r.sold?"disabled":""} ${selected.has(r.id)?"checked":""}></td>
+      <td><span class="ser">${esc(r.serial)||"—"}</span></td>
+      <td>${esc(productName(r))}</td>
+      <td>${esc(r.supplier||"—")}</td>
+      <td>${esc(r.buyer||"—")}</td>
+      <td class="num">${fmt(r.buyPrice)}</td>
+      <td class="num">${r.sold?fmt(r.sellPrice)+(r.wear>0?`<div style="font-size:10px;color:var(--muted)">磨损 ${fmt(r.wear)}</div>`:""):"—"}</td>
+      <td>${esc(r.customer||"—")}</td>
+      <td><span class="badge ${st.cls}">${st.label}</span>${pending(r)>0.005?` <span class="muted">待${fmt(pending(r))}</span>`:""}</td>
+      <td class="num">${r.sold?`<span class="${p>=0?"pos":"neg"}">${fmtProfit(p)}</span>`:"—"}</td>
+      <td><div class="ops"><button data-action="edit-record" data-id="${r.id}" title="编辑">✏️</button><button class="del" data-action="delete-record" data-id="${r.id}" title="删除">🗑️</button></div></td>
+    </tr>`;
+  }).join("");
+}
+function updateSelUI(){
+  const btn = document.getElementById("sell-btn");
+  if(btn){ btn.textContent = "卖货(" + selected.size + ")"; btn.disabled = selected.size === 0; }
+}
+
+/* 统计 */
+function renderStats(){
+  const t = totals();
+  const trend = monthlyTrend(6);
+  const pend = pendingList();
+  main.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-box"><div class="lab">净利润(现金流)</div><div class="val ${t.net>=0?"pos":"neg"}">${fmt(t.net)}</div></div>
+      <div class="stat-box"><div class="lab">总投入</div><div class="val">${fmt(t.invested)}</div></div>
+      <div class="stat-box"><div class="lab">已回款</div><div class="val">${fmt(t.received)}</div></div>
+      <div class="stat-box"><div class="lab">待回款</div><div class="val">${fmt(t.pending)}</div></div>
+      <div class="stat-box"><div class="lab">在库 ${t.stockCount}件</div><div class="val">${fmt(t.stockValue)}</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">近6个月投入/回款趋势</div>
+      <div class="legend-trend"><span><span class="dot" style="background:var(--expense)"></span>投入(进货成本)</span><span><span class="dot" style="background:var(--income)"></span>回款(卖出到账)</span></div>
+      <div class="bar-chart">
+        ${trend.map(x=>{ const max=Math.max(1,x.invested,x.received); return `<div class="bar-group">
+          <div class="bars">
+            <div class="bar invested" style="height:${Math.max(0,x.invested/max*100).toFixed(1)}%" title="投入 ${fmt(x.invested)}"></div>
+            <div class="bar received" style="height:${Math.max(0,x.received/max*100).toFixed(1)}%" title="回款 ${fmt(x.received)}"></div>
+          </div>
+          <div class="bar-label">${Number(x.m.slice(5))}月</div></div>`; }).join("")}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">按渠道/供应商 <span class="muted">已售利润</span></div>
+      ${groupBySorted("supplier").length?groupBySorted("supplier").slice(0,12).map((s,i)=>rankRow(i,s.k,s.count,s.profit)):emptyRank("🏷️","暂无数据")}
+    </div>
+    <div class="card">
+      <div class="card-title">按品牌 <span class="muted">已售利润</span></div>
+      ${groupBySorted("brand").length?groupBySorted("brand").slice(0,12).map((s,i)=>rankRow(i,s.k,s.count,s.profit)):emptyRank("🏷️","暂无数据")}
+    </div>
+    <div class="card">
+      <div class="card-title">按下单人 <span class="muted">已售利润</span></div>
+      ${groupBySorted("buyer").length?groupBySorted("buyer").slice(0,12).map((s,i)=>rankRow(i,s.k,s.count,s.profit)):emptyRank("🧑","暂无数据")}
+    </div>
+    <div class="card">
+      <div class="card-title">回款概况 <span class="muted">待回款 ${fmt(t.pending)}</span></div>
+      ${pend.length?pend.map(r=>`
+        <div class="rank-row">
+          <span class="rn">${esc(r.serial)||"—"} ${esc(productName(r))} <span class="muted">${esc(r.customer||r.supplier||"")}</span></span>
+          <span class="rsub">${shortDate(r.sellDate||r.buyDate)}</span>
+          <span class="rval" style="color:#c2410c">${fmt(pending(r))}</span>
+        </div>`).join(""):`<div class="empty"><span class="em">✅</span>没有待回款</div>`}
+    </div>`;
+}
+function rankRow(i,name,count,val){ return `<div class="rank-row"><span class="idx">${i+1}</span><span class="rn">${esc(name)}</span><span class="rsub">${count}件</span><span class="rval ${val>=0?"pos":"neg"}">${fmtProfit(val)}</span></div>`; }
+function emptyRank(em,txt){ return `<div class="empty"><span class="em">${em}</span>${txt}</div>`; }
+function monthlyTrend(n){
+  const months = lastMonths(thisMonth(), n);
+  return months.map(m => {
+    let invested=0, received_=0;
+    state.devices.forEach(r => {
+      if(monthKey(r.buyDate)===m) invested += unitCost(r);
+      if(r.sold && r.sellDate && monthKey(r.sellDate)===m) received_ += (r.paid||0);
+    });
+    return { m, invested, received: received_ };
+  });
+}
+
+/* 设置 */
+function renderSettings(){
+  const bchips = state.brands.map(b=>`<span class="chip">${esc(b)} <span class="x" data-action="remove-brand" data-id="${esc(b)}">✕</span></span>`).join("");
+  const schips = state.suppliers.map(p=>`<span class="chip">${esc(p)} <span class="x" data-action="remove-supplier" data-id="${esc(p)}">✕</span></span>`).join("");
+  main.innerHTML = `
+    <div class="card"><div class="card-title">品牌管理</div>
+      <div class="add-row"><input id="new-brand" placeholder="输入品牌名"><button class="btn btn-primary" data-action="add-brand">添加</button></div>
+      <div class="chips">${bchips}</div></div>
+    <div class="card"><div class="card-title">渠道/供应商管理</div>
+      <div class="add-row"><input id="new-supplier" placeholder="输入渠道名"><button class="btn btn-primary" data-action="add-supplier">添加</button></div>
+      <div class="chips">${schips}</div></div>
+    <div class="card">
+      <div class="card-title">云端同步（多设备） <span class="muted" id="sync-status">${syncStatusText()}</span></div>
+      <div class="form-grid">
+        <div class="field full"><label>Supabase URL</label><input id="sync-url" type="text" placeholder="https://xxxx.supabase.co" value="${esc(syncCfg.url)}"></div>
+        <div class="field full"><label>Supabase anon Key</label><input id="sync-key" type="text" placeholder="public anon key" value="${esc(syncCfg.key)}"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" data-action="connect-sync">保存并连接</button>
+        <button class="btn btn-ghost" data-action="sync-now">立即同步</button>
+        <button class="btn btn-danger" data-action="disconnect-sync">断开</button>
+      </div>
+      <div class="hint">手机和电脑填同一个 Supabase 项目的 URL 和 Key 即可自动同步；数据仍保存在本地，断网也能用。</div>
+    </div>
+    <div class="card"><div class="card-title">数据</div>
+      <button class="btn btn-ghost btn-block" data-action="export-xlsx">📊 导出 Excel 报表</button>
+      <button class="btn btn-ghost btn-block" data-action="export">📤 导出数据（JSON 备份）</button>
+      <button class="btn btn-ghost btn-block" data-action="import">📥 导入数据</button>
+      <input type="file" id="import-file" accept="application/json" class="hidden">
+      <button class="btn btn-danger btn-block" data-action="clear">🗑️ 清空所有数据</button>
+      <div class="hint">数据保存在当前浏览器本地。</div></div>`;
+}
+
+/* ---------- 弹窗 ---------- */
+const overlay = document.getElementById("overlay");
+function openModal(html){ overlay.innerHTML = `<div class="modal">${html}</div>`; overlay.classList.remove("hidden"); }
+function closeModal(){ overlay.classList.add("hidden"); overlay.innerHTML=""; modal=null; }
+overlay.addEventListener("click", e=>{ if(e.target===overlay) closeModal(); });
+
+function openPurchase(){ modal={kind:"purchase"}; Object.assign(pform,{brand:"",model:"",supplier:state.suppliers[0]||"",buyer:"",buyDate:today(),buyPrice:"",buyShipping:"",qty:"1",serials:"",rebate:"",priceProtection:"",note:""}); renderPurchase(); }
+function openSell(){ modal={kind:"sell"}; Object.assign(sform,{shipping:"",customer:"",sellDate:today(),note:""}); sellData={prices:{},paid:{},wears:{}}; renderSell(); }
+function openEdit(id){ const r=state.devices.find(x=>x.id===id); if(!r) return; modal={kind:"edit",id}; Object.assign(eform,{serial:r.serial||"",brand:r.brand||"",model:r.model||"",supplier:r.supplier||"",buyer:r.buyer||"",buyDate:r.buyDate,buyPrice:r.buyPrice?String(r.buyPrice):"",buyShipping:r.buyShipping?String(r.buyShipping):"",rebate:r.rebate?String(r.rebate):"",priceProtection:r.priceProtection?String(r.priceProtection):"",sold:r.sold?"1":"0",sellPrice:r.sellPrice?String(r.sellPrice):"",sellShipping:r.sellShipping?String(r.sellShipping):"",sellDate:r.sellDate||"",customer:r.customer||"",paidFlag:(r.paid>0.005)?"1":"0",wear:r.wear?String(r.wear):"",note:r.note||""}); renderEdit(); }
+
+function renderPurchase(){
+  const so = state.suppliers.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("");
+  const bo = state.brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join("");
+  openModal(`
+    <div class="modal-title">进货入库</div>
+    <div class="section-label">商品</div>
+    <div class="form-grid">
+      <div class="field"><label>品牌</label><input id="p-brand" type="text" list="brand-list" value="${esc(pform.brand)}"><datalist id="brand-list">${bo}</datalist></div>
+      <div class="field"><label>型号</label><input id="p-model" type="text" value="${esc(pform.model)}"></div>
+    </div>
+    <div class="section-label">进货</div>
+    <div class="form-grid">
+      <div class="field"><label>渠道/供应商</label><input id="p-supplier" type="text" list="supplier-list" value="${esc(pform.supplier)}"><datalist id="supplier-list">${so}</datalist></div>
+      <div class="field"><label>下单人</label><input id="p-buyer" type="text" value="${esc(pform.buyer)}"></div>
+      <div class="field"><label>进价（单价）</label><div class="prefix"><span class="cur">¥</span><input id="p-buyPrice" type="text" inputmode="decimal" value="${esc(pform.buyPrice)}"></div></div>
+      <div class="field"><label>进货运费（总）</label><div class="prefix"><span class="cur">¥</span><input id="p-buyShipping" type="text" inputmode="decimal" value="${esc(pform.buyShipping)}"></div></div>
+      <div class="field"><label>返利（总）</label><div class="prefix"><span class="cur">¥</span><input id="p-rebate" type="text" inputmode="decimal" value="${esc(pform.rebate)}"></div></div>
+      <div class="field"><label>价保（总）</label><div class="prefix"><span class="cur">¥</span><input id="p-priceProtection" type="text" inputmode="decimal" value="${esc(pform.priceProtection)}"></div></div>
+      <div class="field"><label>进货日期</label><input id="p-buyDate" type="date" value="${esc(pform.buyDate)}"></div>
+      <div class="field"><label>数量（无串号时用）</label><input id="p-qty" type="text" inputmode="numeric" value="${esc(pform.qty)}"></div>
+    </div>
+    <div class="section-label">串号（每行一个，一行 = 一件设备）</div>
+    <div class="form-grid">
+      <div class="field full"><textarea id="p-serials" rows="4" placeholder="每行一个串号/IMEI">${esc(pform.serials)}</textarea></div>
+      <div class="field full"><label>备注</label><input id="p-note" type="text" value="${esc(pform.note)}"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" data-action="cancel-modal">取消</button><button class="btn btn-primary" data-action="save-purchase">保存入库</button></div>`);
+}
+function renderSell(){
+  const ids = Array.from(selected).filter(id=>{ const r=state.devices.find(x=>x.id===id); return r && !r.sold; });
+  const groups = {};
+  ids.forEach(id=>{ const r=state.devices.find(x=>x.id===id); const k=productName(r); (groups[k]=groups[k]||[]).push(r); });
+  const groupsHtml = Object.keys(groups).map(k=>{
+    const arr = groups[k];
+    const items = arr.map(r=>`
+      <div class="sg-item">
+        <span class="sg-serial">${esc(r.serial)||"—"}</span>
+        <label class="sg-wear">磨损 <input type="text" inputmode="decimal" data-wear="${r.id}" value="${esc(sellData.wears[r.id]||"")}" placeholder="0"></label>
+      </div>`).join("");
+    return `<div class="sell-group">
+      <div class="sg-head">
+        <div class="sg-name">${esc(k)} <span class="muted">×${arr.length}</span></div>
+        <div class="sg-price"><label>售价</label><input type="text" inputmode="decimal" data-gp="${esc(k)}" value="${esc(sellData.prices[k]||"")}" placeholder="0.00"></div>
+        <label class="sg-paid"><input type="checkbox" data-gpaid="${esc(k)}" ${sellData.paid[k]!=="0"?"checked":""}> 已回款</label>
+      </div>
+      <div class="sg-items">${items}</div>
+    </div>`;
+  }).join("");
+  openModal(`
+    <div class="modal-title">卖货</div>
+    <div class="sel-count">已选 ${ids.length} 件，相同商品合并填价，磨损单独扣</div>
+    ${groupsHtml}
+    <div class="section-label">其他</div>
+    <div class="form-grid">
+      <div class="field"><label>卖出运费（总）</label><div class="prefix"><span class="cur">¥</span><input id="s-shipping" type="text" inputmode="decimal" value="${esc(sform.shipping)}"></div></div>
+      <div class="field"><label>客户/买家</label><input id="s-customer" type="text" value="${esc(sform.customer)}"></div>
+      <div class="field"><label>卖出日期</label><input id="s-sellDate" type="date" value="${esc(sform.sellDate)}"></div>
+      <div class="field full"><label>备注</label><input id="s-note" type="text" value="${esc(sform.note)}"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" data-action="cancel-modal">取消</button><button class="btn btn-primary" data-action="save-sell">确认卖出</button></div>`);
+}
+function renderEdit(){
+  openModal(`
+    <div class="modal-title">编辑设备</div>
+    <div class="form-grid">
+      <div class="field full"><label>串号</label><input id="e-serial" type="text" value="${esc(eform.serial)}"></div>
+      <div class="field"><label>品牌</label><input id="e-brand" type="text" value="${esc(eform.brand)}"></div>
+      <div class="field"><label>型号</label><input id="e-model" type="text" value="${esc(eform.model)}"></div>
+      <div class="field"><label>渠道</label><input id="e-supplier" type="text" value="${esc(eform.supplier)}"></div>
+      <div class="field"><label>下单人</label><input id="e-buyer" type="text" value="${esc(eform.buyer)}"></div>
+      <div class="field"><label>状态</label><select id="e-sold"><option value="0" ${eform.sold==="0"?"selected":""}>在库</option><option value="1" ${eform.sold==="1"?"selected":""}>已卖出</option></select></div>
+      <div class="field"><label>进价</label><div class="prefix"><span class="cur">¥</span><input id="e-buyPrice" type="text" inputmode="decimal" value="${esc(eform.buyPrice)}"></div></div>
+      <div class="field"><label>进货运费</label><div class="prefix"><span class="cur">¥</span><input id="e-buyShipping" type="text" inputmode="decimal" value="${esc(eform.buyShipping)}"></div></div>
+      <div class="field"><label>返利</label><div class="prefix"><span class="cur">¥</span><input id="e-rebate" type="text" inputmode="decimal" value="${esc(eform.rebate)}"></div></div>
+      <div class="field"><label>价保</label><div class="prefix"><span class="cur">¥</span><input id="e-priceProtection" type="text" inputmode="decimal" value="${esc(eform.priceProtection)}"></div></div>
+      <div class="field"><label>进货日期</label><input id="e-buyDate" type="date" value="${esc(eform.buyDate)}"></div>
+      <div class="field"><label>售价</label><div class="prefix"><span class="cur">¥</span><input id="e-sellPrice" type="text" inputmode="decimal" value="${esc(eform.sellPrice)}"></div></div>
+      <div class="field"><label>卖出运费</label><div class="prefix"><span class="cur">¥</span><input id="e-sellShipping" type="text" inputmode="decimal" value="${esc(eform.sellShipping)}"></div></div>
+      <div class="field"><label>磨损（扣款）</label><div class="prefix"><span class="cur">¥</span><input id="e-wear" type="text" inputmode="decimal" value="${esc(eform.wear)}"></div></div>
+      <div class="field"><label>客户</label><input id="e-customer" type="text" value="${esc(eform.customer)}"></div>
+      <div class="field"><label>卖出日期</label><input id="e-sellDate" type="date" value="${esc(eform.sellDate)}"></div>
+      <div class="field"><label>是否回款</label><select id="e-paidFlag"><option value="0" ${eform.paidFlag==="0"?"selected":""}>未回款</option><option value="1" ${eform.paidFlag==="1"?"selected":""}>已回款</option></select></div>
+      <div class="field full"><label>备注</label><input id="e-note" type="text" value="${esc(eform.note)}"></div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" data-action="cancel-modal">取消</button><button class="btn btn-primary" data-action="save-edit">保存</button></div>`);
+}
+
+/* ---------- 事件 ---------- */
+main.addEventListener("click", onMainClick);
+main.addEventListener("input", onMainInput);
+main.addEventListener("change", onMainChange);
+overlay.addEventListener("click", onOverlayClick);
+overlay.addEventListener("input", onOverlayInput);
+overlay.addEventListener("change", onOverlayChange);
+document.getElementById("bottomnav").addEventListener("click", e=>{ const b=e.target.closest(".nav-item"); if(b){ view=b.dataset.view; render(); } });
+
+function onMainClick(e){
+  const el = e.target.closest("[data-action]");
+  if(!el) return;
+  const act = el.dataset.action, id = el.dataset.id;
+  switch(act){
+    case "purchase": openPurchase(); break;
+    case "sell": openSell(); break;
+    case "goto-records": view="records"; render(); break;
+    case "goto-pending": view="records"; recFilter.status="pending"; recFilter.search=""; recFilter.brand=""; recFilter.supplier=""; render(); break;
+    case "edit-record": openEdit(id); break;
+    case "delete-record": deleteRecord(id); break;
+    case "add-brand": addBrand(); break;
+    case "remove-brand": removeBrand(id); break;
+    case "add-supplier": addSupplier(); break;
+    case "remove-supplier": removeSupplier(id); break;
+    case "export-xlsx": exportXlsx(); break;
+    case "export": exportData(); break;
+    case "import": document.getElementById("import-file").click(); break;
+    case "clear": clearData(); break;
+    case "connect-sync": {
+      const u = document.getElementById("sync-url").value.trim();
+      const k = document.getElementById("sync-key").value.trim();
+      syncCfg = { url: u, key: k };
+      connectSync();
+      break;
+    }
+    case "sync-now": syncNow(); break;
+    case "disconnect-sync": disconnectSync(); break;
+  }
+}
+function onMainInput(e){
+  const t = e.target;
+  if(t.id==="search"){ recFilter.search=t.value; const tb=document.getElementById("tbody"); if(tb) tb.innerHTML=rowsHtml(); syncSelectAll(); }
+}
+function onMainChange(e){
+  const t = e.target;
+  if(t.id==="f-status"){ recFilter.status=t.value; refreshTbody(); }
+  else if(t.id==="f-brand"){ recFilter.brand=t.value; refreshTbody(); }
+  else if(t.id==="f-supplier"){ recFilter.supplier=t.value; refreshTbody(); }
+  else if(t.id==="import-file"){ importData(t.files[0]); t.value=""; }
+  else if(t.type==="checkbox" && t.dataset.sel==="device"){
+    if(t.checked) selected.add(t.dataset.id); else selected.delete(t.dataset.id);
+    updateSelUI();
+    syncSelectAll();
+  }
+  else if(t.id==="select-all"){
+    const list = filteredDevices().filter(r=>!r.sold);
+    if(t.checked) list.forEach(r=>selected.add(r.id)); else list.forEach(r=>selected.delete(r.id));
+    refreshTbody();
+  }
+}
+function refreshTbody(){ const tb=document.getElementById("tbody"); if(tb) tb.innerHTML=rowsHtml(); updateSelUI(); syncSelectAll(); }
+function syncSelectAll(){
+  const sa = document.getElementById("select-all");
+  if(!sa) return;
+  const list = filteredDevices().filter(r=>!r.sold);
+  sa.checked = list.length>0 && list.every(r=>selected.has(r.id));
+}
+function onOverlayClick(e){
+  const el = e.target.closest("[data-action]");
+  if(!el) return;
+  const act = el.dataset.action;
+  if(act==="cancel-modal") closeModal();
+  else if(act==="save-purchase") savePurchase();
+  else if(act==="save-sell") saveSell();
+  else if(act==="save-edit") saveEdit();
+}
+function onOverlayInput(e){
+  const t = e.target;
+  const pm = {"p-brand":"brand","p-model":"model","p-supplier":"supplier","p-buyer":"buyer","p-buyPrice":"buyPrice","p-buyShipping":"buyShipping","p-qty":"qty","p-serials":"serials","p-rebate":"rebate","p-priceProtection":"priceProtection","p-note":"note","p-buyDate":"buyDate"};
+  const sm = {"s-shipping":"shipping","s-customer":"customer","s-sellDate":"sellDate","s-note":"note"};
+  const em = {"e-serial":"serial","e-brand":"brand","e-model":"model","e-supplier":"supplier","e-buyer":"buyer","e-buyPrice":"buyPrice","e-buyShipping":"buyShipping","e-rebate":"rebate","e-priceProtection":"priceProtection","e-buyDate":"buyDate","e-sellPrice":"sellPrice","e-sellShipping":"sellShipping","e-wear":"wear","e-customer":"customer","e-sellDate":"sellDate","e-note":"note"};
+  if(t.dataset.gp) sellData.prices[t.dataset.gp]=t.value;
+  else if(t.dataset.wear) sellData.wears[t.dataset.wear]=t.value;
+  else if(pm[t.id]) pform[pm[t.id]]=t.value;
+  else if(sm[t.id]) sform[sm[t.id]]=t.value;
+  else if(em[t.id]) eform[em[t.id]]=t.value;
+}
+function onOverlayChange(e){
+  const t = e.target;
+  if(t.id==="e-sold") eform.sold = t.value;
+  else if(t.id==="e-paidFlag") eform.paidFlag = t.value;
+  else if(t.dataset.gpaid) sellData.paid[t.dataset.gpaid] = t.checked ? "1" : "0";
+}
+
+/* ---------- 业务 ---------- */
+function savePurchase(){
+  const brand=pform.brand.trim(), model=pform.model.trim();
+  if(!brand && !model){ toast("请填写品牌或型号"); return; }
+  const buyPrice = Math.max(0, num(pform.buyPrice,0));
+  const shipT = Math.max(0, num(pform.buyShipping,0));
+  const rebT = Math.max(0, num(pform.rebate,0));
+  const ppT = Math.max(0, num(pform.priceProtection,0));
+  const serials = parseSerials(pform.serials);
+  let count = serials.length;
+  if(!count) count = Math.max(1, Math.round(num(pform.qty,1)));
+  const ship = distribute(shipT,count), reb = distribute(rebT,count), pp = distribute(ppT,count);
+  for(let i=0;i<count;i++){
+    state.devices.push({
+      id:uid(), createdAt:new Date().toISOString(),
+      serial: serials[i] || (serials.length? "" : (count>1? "无串号"+(i+1) : "")),
+      brand, model, supplier:pform.supplier.trim(), buyer:pform.buyer.trim(),
+      buyDate: pform.buyDate||today(),
+      buyPrice: round2(buyPrice), buyShipping: ship[i], rebate: reb[i], priceProtection: pp[i],
+      sold:false, sellPrice:0, sellShipping:0, sellDate:"", customer:"", paid:0, wear:0,
+      note: pform.note.trim()
+    });
+  }
+  save(); closeModal(); render(); toast("已入库 "+count+" 件");
+}
+function saveSell(){
+  const ids = Array.from(selected).filter(id=>{ const r=state.devices.find(x=>x.id===id); return r && !r.sold; });
+  if(!ids.length){ toast("请先勾选要卖出的设备"); return; }
+  const gkeys = new Set();
+  ids.forEach(id=>{ const r=state.devices.find(x=>x.id===id); if(r) gkeys.add(productName(r)); });
+  for(const k of gkeys){
+    const p = num(sellData.prices[k], NaN);
+    if(isNaN(p) || p<0){ toast("请填写每件商品的售价"); return; }
+  }
+  for(const id of ids){
+    const r = state.devices.find(x=>x.id===id);
+    if(!r) continue;
+    const base = num(sellData.prices[productName(r)], 0);
+    const wear = Math.max(0, num(sellData.wears[id], 0));
+    if(wear > base){ toast("磨损金额不能大于售价"); return; }
+  }
+  const shipT = Math.max(0, num(sform.shipping,0));
+  const ship = distribute(shipT, ids.length);
+  ids.forEach((id,i)=>{
+    const r = state.devices.find(x=>x.id===id);
+    if(!r) return;
+    const k = productName(r);
+    const base = round2(num(sellData.prices[k], 0));
+    const wear = round2(Math.max(0, num(sellData.wears[id], 0)));
+    r.sold = true;
+    r.sellPrice = round2(base - wear);
+    r.wear = wear;
+    r.sellShipping = ship[i];
+    r.paid = (sellData.paid[k] !== "0") ? r.sellPrice : 0;
+    r.customer = sform.customer.trim();
+    r.sellDate = sform.sellDate || today();
+    if(sform.note.trim()) r.note = (r.note? r.note+" / ":"") + sform.note.trim();
+  });
+  save(); closeModal(); selected.clear(); render(); toast("已卖出 "+ids.length+" 件");
+}
+function saveEdit(){
+  const r = state.devices.find(x=>x.id===modal.id);
+  if(!r) return;
+  r.serial=eform.serial.trim(); r.brand=eform.brand.trim(); r.model=eform.model.trim();
+  r.supplier=eform.supplier.trim(); r.buyer=eform.buyer.trim();
+  r.buyDate=eform.buyDate||today();
+  r.buyPrice=Math.max(0,num(eform.buyPrice,0)); r.buyShipping=Math.max(0,num(eform.buyShipping,0));
+  r.rebate=Math.max(0,num(eform.rebate,0)); r.priceProtection=Math.max(0,num(eform.priceProtection,0));
+  r.sold = eform.sold==="1";
+  r.sellPrice=Math.max(0,num(eform.sellPrice,0)); r.sellShipping=Math.max(0,num(eform.sellShipping,0));
+  r.sellDate=eform.sellDate||""; r.customer=eform.customer.trim(); r.paid=(eform.paidFlag==="1")?r.sellPrice:0; r.wear=Math.max(0,num(eform.wear,0));
+  r.note=eform.note.trim();
+  save(); closeModal(); render(); toast("已保存");
+}
+function deleteRecord(id){
+  if(!confirm("确定删除这台设备吗？")) return;
+  state.devices = state.devices.filter(x=>x.id!==id);
+  selected.delete(id);
+  save(); render(); toast("已删除");
+}
+function addBrand(){ const v=document.getElementById("new-brand").value.trim(); if(!v){toast("请输入品牌名");return;} if(state.brands.includes(v)){toast("已存在");return;} state.brands.push(v); save(); renderSettings(); toast("已添加"); }
+function removeBrand(b){ state.brands=state.brands.filter(x=>x!==b); save(); renderSettings(); toast("已移除"); }
+function addSupplier(){ const v=document.getElementById("new-supplier").value.trim(); if(!v){toast("请输入渠道名");return;} if(state.suppliers.includes(v)){toast("已存在");return;} state.suppliers.push(v); save(); renderSettings(); toast("已添加"); }
+function removeSupplier(p){ state.suppliers=state.suppliers.filter(x=>x!==p); save(); renderSettings(); toast("已移除"); }
+
+/* ---------- 统计分组（修正） ---------- */
+function profitSumBy(field, key){
+  let s=0;
+  state.devices.forEach(r=>{ if(r.sold && ((r[field]||"未填")===key)) s += profit(r); });
+  return s;
+}
+function groupBySorted(field){
+  const map = {};
+  state.devices.filter(r=>r.sold).forEach(r=>{ const k=r[field]||"未填"; map[k]=(map[k]||0)+1; });
+  return Object.keys(map).map(k=>({k, count:map[k], profit:profitSumBy(field,k)})).sort((a,b)=>b.profit-a.profit);
+}
+
+/* ---------- Excel 导出 ---------- */
+function buildReportSheets(){
+  const head = ["串号","品牌","型号","渠道/供应商","下单人","客户","进货日期","进价","进货运费","返利","价保","卖出日期","售价","磨损","卖出运费","已回款","状态","待回款","利润"];
+  const rows = [head];
+  state.devices.forEach(r=>{
+    rows.push([
+      r.serial||"", r.brand||"", r.model||"", r.supplier||"", r.buyer||"", r.customer||"",
+      r.buyDate||"", r.buyPrice, r.buyShipping, r.rebate, r.priceProtection,
+      r.sellDate||"", r.sellPrice, r.wear, r.sellShipping, r.paid,
+      STATUS[status(r)].label, round2(pending(r)), r.sold?round2(profit(r)):""
+    ]);
+  });
+  const t = totals();
+  const s2 = [];
+  s2.push(["总投入", round2(t.invested)]);
+  s2.push(["已回款(含返利价保)", round2(t.received)]);
+  s2.push(["待回款", round2(t.pending)]);
+  s2.push(["在库货值", round2(t.stockValue)]);
+  s2.push(["在库数量", t.stockCount]);
+  s2.push(["现金流净利润", round2(t.net)]);
+  s2.push([]);
+  s2.push(["渠道/供应商","件数","已售利润"]);
+  groupBySorted("supplier").forEach(s=>s2.push([s.k, s.count, round2(s.profit)]));
+  s2.push([]);
+  s2.push(["品牌","件数","已售利润"]);
+  groupBySorted("brand").forEach(s=>s2.push([s.k, s.count, round2(s.profit)]));
+  s2.push([]);
+  s2.push(["下单人","件数","已售利润"]);
+  groupBySorted("buyer").forEach(s=>s2.push([s.k, s.count, round2(s.profit)]));
+  return [ {name:"货单明细", rows}, {name:"汇总", rows:s2} ];
+}
+function exportXlsx(){
+  const bytes = buildXlsx(buildReportSheets());
+  const blob = new Blob([bytes], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "撸货进销存报表-" + today() + ".xlsx";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("已导出 Excel 报表");
+}
+function buildXlsx(sheets){
+  const enc = new TextEncoder();
+  const files = [
+    {name:"[Content_Types].xml", data:enc.encode(contentTypesXml(sheets.length))},
+    {name:"_rels/.rels", data:enc.encode(relsXml())},
+    {name:"xl/workbook.xml", data:enc.encode(workbookXml(sheets))},
+    {name:"xl/_rels/workbook.xml.rels", data:enc.encode(workbookRelsXml(sheets.length))}
+  ];
+  sheets.forEach((s,i)=>files.push({name:"xl/worksheets/sheet"+(i+1)+".xml", data:enc.encode(sheetXml(s.rows))}));
+  return zipStore(files);
+}
+function contentTypesXml(n){ let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'; for(let i=1;i<=n;i++) x+='<Override PartName="/xl/worksheets/sheet'+i+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; return x+'</Types>'; }
+function relsXml(){ return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'; }
+function workbookXml(sheets){ let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'; sheets.forEach((s,i)=>{ x+='<sheet name="'+xmlEsc(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>'; }); return x+'</sheets></workbook>'; }
+function workbookRelsXml(n){ let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'; for(let i=1;i<=n;i++) x+='<Relationship Id="rId'+i+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+i+'.xml"/>'; return x+'</Relationships>'; }
+function sheetXml(rows){ let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'; rows.forEach((row,ri)=>{ x+='<row r="'+(ri+1)+'">'; row.forEach((cell,ci)=>{ if(cell===null||cell===undefined||cell==="") return; const ref=colName(ci)+(ri+1); if(typeof cell==="number") x+='<c r="'+ref+'"><v>'+cell+'</v></c>'; else x+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(String(cell))+'</t></is></c>'; }); x+='</row>'; }); return x+'</sheetData></worksheet>'; }
+function colName(i){ let s=""; i++; while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
+function xmlEsc(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c])); }
+function zipStore(files){
+  const enc=new TextEncoder(); const chunks=[], central=[]; let offset=0;
+  const now=new Date(); const dosTime=((now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1))&0xFFFF; const dosDate=(((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate())&0xFFFF;
+  const crcTable=crc32Table();
+  for(const f of files){
+    const name=enc.encode(f.name), data=f.data, crc=crc32(data,crcTable), size=data.length;
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0,true); lh.setUint16(8,0,true); lh.setUint16(10,dosTime,true); lh.setUint16(12,dosDate,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,size,true); lh.setUint32(22,size,true); lh.setUint16(26,name.length,true); lh.setUint16(28,0,true);
+    chunks.push(new Uint8Array(lh.buffer), name, data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0,true); ch.setUint16(10,0,true); ch.setUint16(12,dosTime,true); ch.setUint16(14,dosDate,true);
+    ch.setUint32(16,crc,true); ch.setUint32(20,size,true); ch.setUint32(24,size,true); ch.setUint16(28,name.length,true); ch.setUint16(30,0,true); ch.setUint16(32,0,true); ch.setUint16(34,0,true); ch.setUint16(36,0,true); ch.setUint32(38,0,true); ch.setUint32(42,offset,true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + size;
+  }
+  let csize=0; central.forEach(b=>csize+=b.length);
+  const eocd=new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0,0x06054b50,true); eocd.setUint16(4,0,true); eocd.setUint16(6,0,true); eocd.setUint16(8,files.length,true); eocd.setUint16(10,files.length,true);
+  eocd.setUint32(12,csize,true); eocd.setUint32(16,offset,true); eocd.setUint16(20,0,true);
+  chunks.push(...central, new Uint8Array(eocd.buffer));
+  let total=0; chunks.forEach(c=>total+=c.length);
+  const out=new Uint8Array(total); let pos=0; chunks.forEach(c=>{out.set(c,pos); pos+=c.length;}); return out;
+}
+function crc32Table(){ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; } return t; }
+function crc32(buf,table){ let crc=0xFFFFFFFF; for(let i=0;i<buf.length;i++) crc=(crc>>>8)^table[(crc^buf[i])&0xFF]; return (crc^0xFFFFFFFF)>>>0; }
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="撸货进销存备份-"+today()+".json"; a.click(); URL.revokeObjectURL(a.href); toast("已导出备份");
+}
+function importData(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(!d||!Array.isArray(d.devices)) throw new Error();
+      state={ suppliers:Array.isArray(d.suppliers)&&d.suppliers.length?d.suppliers:defaults().suppliers, brands:Array.isArray(d.brands)&&d.brands.length?d.brands:defaults().brands, devices:d.devices };
+      save(); render(); toast("导入成功，共 "+state.devices.length+" 件");
+    }catch(err){ toast("导入失败：文件格式不正确"); }
+  };
+  reader.readAsText(file);
+}
+function clearData(){ if(!confirm("确定清空所有数据吗？")) return; state=defaults(); save(); render(); toast("已清空"); }
+
+/* ---------- 云端同步（Supabase 多设备自动同步） ---------- */
+const SYNC_CONFIG_KEY = "luhuo.sync.config";
+let syncCfg = (() => { try { return JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY)) || {url:"",key:""}; } catch(e){ return {url:"",key:""}; } })();
+let supabase = null, syncChannel = null, syncReady = false, pushTimer = null;
+function saveSyncConfig(){ localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(syncCfg)); }
+function loadSupabaseLib(cb){
+  if(window.supabase){ cb(); return; }
+  const s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+  s.onload = cb;
+  s.onerror = function(){ toast("无法加载云端组件，请检查网络"); };
+  document.head.appendChild(s);
+}
+function currentContent(){ return { suppliers: state.suppliers, brands: state.brands, devices: state.devices }; }
+function applyRemote(content, updatedAt){
+  if(!content || !Array.isArray(content.devices)) return false;
+  if(updatedAt && state.syncedAt && updatedAt <= state.syncedAt) return false;
+  if(JSON.stringify(currentContent()) === JSON.stringify(content)) return false;
+  state.suppliers = Array.isArray(content.suppliers) && content.suppliers.length ? content.suppliers : defaults().suppliers;
+  state.brands = Array.isArray(content.brands) && content.brands.length ? content.brands : defaults().brands;
+  state.devices = content.devices;
+  state.syncedAt = updatedAt;
+  persistLocal();
+  render();
+  return true;
+}
+function pullRemote(cb){
+  if(!supabase){ cb && cb(); return; }
+  supabase.from("luhuo_docs").select("*").eq("id","main").maybeSingle()
+    .then(function(res){ if(res && res.data && res.data.content) applyRemote(res.data.content, res.data.updated_at); cb && cb(); })
+    .catch(function(){ cb && cb(); });
+}
+function pushRemote(){
+  if(!supabase) return;
+  const now = new Date().toISOString();
+  state.syncedAt = now;
+  persistLocal();
+  supabase.from("luhuo_docs").upsert({ id:"main", content: currentContent(), updated_at: now })
+    .then(function(res){ if(res && res.error) console.warn("sync push error", res.error.message); });
+}
+function schedulePush(){ clearTimeout(pushTimer); pushTimer = setTimeout(pushRemote, 600); }
+function subscribeRealtime(){
+  if(!supabase) return;
+  try{
+    syncChannel = supabase.channel("luhuo_docs_changes")
+      .on("postgres_changes", { event:"*", schema:"public", table:"luhuo_docs", filter:"id=eq.main" }, function(payload){
+        const row = payload.new;
+        if(row && row.content) applyRemote(row.content, row.updated_at);
+      })
+      .subscribe();
+  }catch(e){ console.warn("realtime error", e); }
+}
+function connectSync(silent){
+  if(!syncCfg.url || !syncCfg.key){ if(!silent) toast("请填写 Supabase URL 和 Key"); return; }
+  saveSyncConfig();
+  loadSupabaseLib(function(){
+    const { createClient } = window.supabase;
+    supabase = createClient(syncCfg.url, syncCfg.key);
+    pullRemote(function(){ pushRemote(); subscribeRealtime(); syncReady = true; renderSettings(); if(!silent) toast("云端同步已连接"); });
+  });
+}
+function syncNow(){
+  const u = document.getElementById("sync-url"), k = document.getElementById("sync-key");
+  if(u && k){ const nu = u.value.trim(), nk = k.value.trim(); if(nu || nk) syncCfg = { url: nu, key: nk }; }
+  if(!supabase){ connectSync(); return; }
+  pullRemote(function(){ pushRemote(); toast("已同步"); });
+}
+function disconnectSync(){
+  if(syncChannel && supabase){ try{ supabase.removeChannel(syncChannel); }catch(e){} }
+  syncChannel = null; supabase = null; syncReady = false;
+  syncCfg = {url:"", key:""};
+  saveSyncConfig();
+  renderSettings();
+  toast("已断开云端同步");
+}
+function syncStatusText(){
+  if(syncCfg.url && syncReady) return "已连接 · 自动同步中";
+  if(syncCfg.url) return "已配置 · 未连接";
+  return "未启用";
+}
+
+/* ---------- Toast ---------- */
+let toastTimer=null;
+function toast(msg){ toastEl.textContent=msg; toastEl.classList.remove("hidden"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastEl.classList.add("hidden"),2200); }
+
+render();
+if(syncCfg.url && syncCfg.key) connectSync(true);
+</script>
+
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js");});}
+</script>
+</body>
+</html>

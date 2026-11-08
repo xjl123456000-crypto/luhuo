@@ -1,0 +1,16 @@
+{
+  "name": "撸货进销存",
+  "short_name": "撸货",
+  "description": "撸货进销存记账系统：设备串号管理、进销利润、回款跟踪",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f2f4f8",
+  "theme_color": "#5b6cff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
